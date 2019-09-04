@@ -70,7 +70,7 @@ void setup() {
   display.setCursor(0,0);
   display.println("Air Logger");
   display.setTextSize(1);
-  display.println("v1.00");
+  display.println("v1.10");
   display.display();
   delay(2000);
 
@@ -171,20 +171,20 @@ void setup() {
 void loop() {
   DateTime currentTime = rtc.now();
 
-  // Echo current log file to serial port if B button pressed.
-  if (!digitalRead(BUTTON_B)) {
+  // Echo current log file to serial port if A button pressed.
+  if (!digitalRead(BUTTON_A)) {
     echoFile();
   }
 
   // Turn on display if C button pressed.
-  if(!displayOn && !digitalRead(BUTTON_C)){
+  if(!displayOn && !digitalRead(BUTTON_B)){
     displayOn = TRUE;
     displayOnTime = currentTime;
     //airSensor.setMeasurementInterval(DISPLAY_INTERVAL);
   }
 
-  // Turn off display if it's been on too long.
-  if(displayOn && (currentTime.secondstime() - displayOnTime.secondstime() >= DISPLAY_DURATION)) {
+  // Turn off display if button C is pressed or it's been on too long.
+  if(displayOn && (!digitalRead(BUTTON_C) || (currentTime.secondstime() - displayOnTime.secondstime() >= DISPLAY_DURATION))) {
     displayOn = FALSE;
     display.clearDisplay();
     display.display();
@@ -204,19 +204,21 @@ void loop() {
       display.display();
       return;
     }
-
+    float pressure = bmp.pressure / 100.0;
     // Update CO2 sensor pressure compensation with latest pressure reading.
-    airSensor.setAmbientPressure(uint16_t(bmp.pressure / 100.0));
+    airSensor.setAmbientPressure(uint16_t(pressure));
 
-    // Update battery voltage.
+    // Need to disable then re-enable pullup on the button A pin because it's also uses as the battery voltage analogue input
+    // and if we don't it generates false button presses.
+    pinMode(BUTTON_A, INPUT);
     float batteryVoltage = getBatteryVoltage();
+    pinMode(BUTTON_A, INPUT_PULLUP);
 
     // If a CO2 sensor reading is available need to read it, regardless of whether
     // we're going to display or log it.
     uint16_t co2 = airSensor.getCO2();
     float temperature = airSensor.getTemperature();
     float humidity = airSensor.getHumidity();
-    float pressure = bmp.pressure / 100.0;
 
     // Update display with latest CO2, temperature, humidity, pressure
     // & battery voltage readings, if display is on.
@@ -236,7 +238,7 @@ void loop() {
 }
 
 void echoFile() {
-  Serial.begin(115200);
+  Serial.begin(9600);
   for (int i = 0; i < 100; i++) {
     // Wait for up to a second for serial port to open
     if (Serial) {
